@@ -1,12 +1,10 @@
 package com.udacity.google.sunshine;
 
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.text.format.Time;
@@ -19,8 +17,23 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.ListView;
-import android.widget.Toast;
+
+import com.android.volley.Cache;
+import com.android.volley.Network;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.BasicNetwork;
+import com.android.volley.toolbox.DiskBasedCache;
+import com.android.volley.toolbox.HurlStack;
+import com.android.volley.toolbox.ImageRequest;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.JsonRequest;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -32,22 +45,17 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.sql.Array;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
  * Created by Dell on 8/22/2015.
  */
-public class ForecastFragment extends Fragment {
+public class ForecastFragmentWithVolley extends Fragment {
 
-    public ForecastFragment() {
+    public ForecastFragmentWithVolley() {
     }
 
-    ArrayAdapter<String> adapter = null;
-
-public static String postalCode = null;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -59,6 +67,9 @@ public static String postalCode = null;
     View rootView = null;
 
     ListView listView  ;
+
+    String [] weatherData=null;
+    ArrayAdapter<String> adapter = null ;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -74,23 +85,149 @@ public static String postalCode = null;
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
 
-                getActivity().startActivity(new Intent(getActivity(), DetailActivity.class).putExtra(Intent.EXTRA_TEXT, adapter.getItem(i) ) );
+getActivity().startActivity(new Intent(getActivity(), DetailActivity.class).putExtra(Intent.EXTRA_TEXT, adapter.getItem(i) ) );
             }
         });
 
 
+        //HttpURLConnection ???
+
+
+//            HttpStack stack;
+//
+//            // If the device is running a version >= Gingerbread...
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD) {
+//                // ...use HttpURLConnection for stack.
+//            } else {
+//                // ...use AndroidHttpClient for stack.
+//            }
+//            Network network = new BasicNetwork(stack);
+//
+//
+
+
+
+        //getCacheDir()  ??
+
+        // Instantiate the cache
+//            Cache cache = new DiskBasedCache(getCacheDir(), 1024 * 1024); // 1MB cap
+//
+//            // Set up the network to use HttpURLConnection as the HTTP client.
+//            Network network = new BasicNetwork(new HurlStack());
+//
+//            // Instantiate the RequestQueue with the cache and network.
+//           RequestQueue mRequestQueue = new RequestQueue(cache, network);
+//
+//
+//            // Start the queue
+//            mRequestQueue.start();
+
+        Uri.Builder builder = new Uri.Builder();
+        builder.scheme("http")
+                .authority("api.openweathermap.org")
+                .appendPath("data")
+                .appendPath("2.5")
+                .appendPath("forecast")
+                .appendPath("daily")
+                .appendQueryParameter("q", "94034")
+                .appendQueryParameter("mode", "json")
+                .appendQueryParameter("units", "metric")
+                .appendQueryParameter("cnt", "7");
+
+        //"http://api.openweathermap.org/data/2.5/forecast/daily?q=94043&mode=json&units=metric&cnt=7"
+        String myUrl = builder.build().toString();
+
+
+        RequestQueue queue = Volley.newRequestQueue(getActivity());
+
+
+        // Formulate the request and handle the response.
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, myUrl,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+
+                        try {
+                            weatherData = getWeatherDataFromJson(response,7);
+
+
+                          adapter = new ArrayAdapter<String>(getActivity(),
+                                    android.R.layout.simple_list_item_1, Arrays.asList(weatherData));
+
+                            listView.setAdapter(adapter );
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+
+                    }
+                });
+
+
+        queue.add(stringRequest);
+
+        JsonObjectRequest jsObjRequest = new JsonObjectRequest
+                (Request.Method.GET, myUrl, null, new Response.Listener<JSONObject>() {
+
+                    @Override
+                    public void onResponse(JSONObject response) {
+
+                    }
+                }, new Response.ErrorListener() {
+
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+
+                    }
+                });
+
+
+
+        //final ImageView mImageView;
+        String url = "https://s3.amazonaws.com/content.udacity-data.com/course/ud853/ic_launcher.png";
+
+        //mImageView = (ImageView) rootView.findViewById(R.id.ImageView);
+
+
+        // Retrieves an image specified by the URL, displays it in the UI.
+        ImageRequest imageRequest = new ImageRequest(url,
+                new Response.Listener<Bitmap>() {
+                    @Override
+                    public void onResponse(Bitmap bitmap) {
+
+                        //mImageView.setImageBitmap(bitmap);
+
+
+                    }
+                }, 0, 0, null,
+                new Response.ErrorListener() {
+                    public void onErrorResponse(VolleyError error) {
+
+
+                    }
+                });
+
+
+
+
+
+        // Add the request to the RequestQueue.
+        queue.add(imageRequest);
+
+
+
+
+
         return rootView;
     }
-
-
-
-    @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        super.onCreateOptionsMenu(menu, inflater);
-
-        inflater.inflate(R.menu.forecastfragment, menu);
-    }
-
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -99,118 +236,17 @@ public static String postalCode = null;
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
         if (id == R.id.action_refresh) {
-        updateWeather();
+
 
 
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
 
 
-    public class FetchWeatherTask extends AsyncTask<String, Void, String[]> {
 
-        @Override
-        protected String[] doInBackground(String... postalCode) {
-            // These two need to be declared outside the try/catch
-            // so that they can be closed in the finally block.
-            HttpURLConnection urlConnection = null;
-            BufferedReader reader = null;
-            // Will contain the raw JSON response as a string.
-            String forecastJsonStr = null;
-            String[] weatherData = null;
-
-            try {
-                // Construct the URL for the OpenWeatherMap query
-                // Possible parameters are avaiable at OWM's forecast API page, at
-                // http://openweathermap.org/API#forecast
-
-                Uri.Builder builder = new Uri.Builder();
-                builder.scheme("http")
-                        .authority("api.openweathermap.org")
-                        .appendPath("data")
-                        .appendPath("2.5")
-                        .appendPath("forecast")
-                        .appendPath("daily")
-                        .appendQueryParameter("q", postalCode[0])
-                        .appendQueryParameter("mode", "json")
-                        .appendQueryParameter("units", "metric")
-                        .appendQueryParameter("cnt", "7");
-
-                //"http://api.openweathermap.org/data/2.5/forecast/daily?q=94043&mode=json&units=metric&cnt=7"
-                String myUrl = builder.build().toString();
-                URL url = new URL(myUrl);
-
-
-                // Create the request to OpenWeatherMap, and open the connection
-                urlConnection = (HttpURLConnection) url.openConnection();
-                urlConnection.setRequestMethod("GET");
-                urlConnection.connect();
-
-                // Read the input stream into a String
-                InputStream inputStream = urlConnection.getInputStream();
-                StringBuffer buffer = new StringBuffer();
-                if (inputStream == null) {
-                    // Nothing to do.
-                    return null;
-                }
-                reader = new BufferedReader(new InputStreamReader(inputStream));
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    // Since it's JSON, adding a newline isn't necessary (it won't affect parsing)
-                    // But it does make debugging a *lot* easier if you print out the completed
-                    // buffer for debugging.
-                    buffer.append(line + "\n");
-                }
-
-                if (buffer.length() == 0) {
-                    // Stream was empty.  No point in parsing.
-                    return null;
-                }
-                forecastJsonStr = buffer.toString();
-
-
-                 weatherData = getWeatherDataFromJson(forecastJsonStr,7);
-
-                return weatherData;
-
-            } catch (IOException e) {
-                Log.e("ForecastFragment", "Error ", e);
-                // If the code didn't successfully get the weather data, there's no point in attemping
-                // to parse it.
-                return null;
-            } catch (JSONException e) {
-                e.printStackTrace();
-            } finally{
-                if (urlConnection != null) {
-                    urlConnection.disconnect();
-                }
-                if (reader != null) {
-                    try {
-                        reader.close();
-                    } catch (final IOException e) {
-                        Log.e("ForecastFragment", "Error closing stream", e);
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(String[] weatherData) {
-            super.onPostExecute(weatherData);
-
-
-           adapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_list_item_1, Arrays.asList(weatherData));
-
-            listView.setAdapter(adapter );
-
-        }
-    }
 
 
     /* The date/time conversion code is going to be moved outside the asynctask later,
@@ -226,15 +262,7 @@ public static String postalCode = null;
     /**
      * Prepare the weather high/lows for presentation.
      */
-    private String formatHighLows(double high, double low, String unitType) {
-
-        if (unitType.equals(getString(R.string.pref_units_imperial))) {
-            high = (high * 1.8) + 32;
-            low = (low * 1.8) + 32;
-        } else if (!unitType.equals(getString(R.string.pref_units_metric))) {
-            Log.d(LOG_TAG, "Unit type not found: " + unitType);
-        }
-
+    private String formatHighLows(double high, double low) {
         // For presentation, assume the user doesn't care about tenths of a degree.
         long roundedHigh = Math.round(high);
         long roundedLow = Math.round(low);
@@ -242,7 +270,6 @@ public static String postalCode = null;
         String highLowStr = roundedHigh + "/" + roundedLow;
         return highLowStr;
     }
-
 
     static String LOG_TAG = "ForecastFragment";
 
@@ -285,18 +312,6 @@ public static String postalCode = null;
         dayTime = new Time();
 
         String[] resultStrs = new String[numDays];
-
-        // Data is fetched in Celsius by default.
-        // If user prefers to see in Fahrenheit, convert the values here.
-        // We do this rather than fetching in Fahrenheit so that the user can
-        // change this option without us having to re-fetch the data once
-        // we start storing the values in a database.
-        SharedPreferences sharedPrefs =
-                PreferenceManager.getDefaultSharedPreferences(getActivity());
-        String unitType = sharedPrefs.getString(
-                getString(R.string.pref_units_key),
-                getString(R.string.pref_units_metric));
-
         for(int i = 0; i < weatherArray.length(); i++) {
             // For now, using the format "Day, description, hi/low"
             String day;
@@ -324,34 +339,16 @@ public static String postalCode = null;
             double high = temperatureObject.getDouble(OWM_MAX);
             double low = temperatureObject.getDouble(OWM_MIN);
 
-            highAndLow = formatHighLows(high, low, unitType);
+            highAndLow = formatHighLows(high, low);
             resultStrs[i] = day + " - " + description + " - " + highAndLow;
         }
+
+
         return resultStrs;
 
     }
 
 
-    @Override
-    public void onStart() {
-        super.onStart();
-
-
-        updateWeather();
-    }
-
-
-    void updateWeather(){
-
-        //read the postal code from shared preference
-        SharedPreferences preferences = getActivity().getSharedPreferences("Settings", Context.MODE_PRIVATE);
-
-        postalCode =  preferences.getString("Postal Code", "94043");
-        new FetchWeatherTask().execute(postalCode);
-
-
-
-    }
     /**
      * Given a string of the form returned by the api call:
      * http://api.openweathermap.org/data/2.5/forecast/daily?q=94043&mode=json&units=metric&cnt=7
@@ -374,6 +371,13 @@ public static String postalCode = null;
         return max;
     }
 
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+
+    inflater.inflate(R.menu.forecastfragment, menu);
+    }
 
 
 }
